@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "rest-api-with-flask-restx"
+version = "0.1.0"
+description = ""
+authors = ["kirill0720 <knete-87@mail.ru>"]
+readme = "README.md"
+packages = [{include = "rest_api_with_flask_restx"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
