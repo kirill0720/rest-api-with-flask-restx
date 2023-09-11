@@ -1,10 +1,19 @@
 from flask_restx import Resource, Namespace
+from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 
-from .api_models import course_model, student_model, course_input_model, student_input_model
+from .api_models import course_model, student_model, course_input_model, student_input_model, user_model, login_model
 from .extensions import db
-from .models import Course, Student
+from .models import Course, Student, User
 
-ns = Namespace("api", description="REST API")
+authorizations = {
+    "jsonWebToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+    }
+}
+ns = Namespace("api", description="REST API", authorizations=authorizations)
 
 
 @ns.route("/hello")
@@ -15,9 +24,12 @@ class Hello(Resource):
 
 @ns.route("/courses")
 class CourseListAPI(Resource):
+    method_decorators = [jwt_required()]
+
+    @ns.doc(security="jsonWebToken")
     @ns.marshal_list_with(course_model)
     def get(self):
-        return Course.query.all()
+        return Course.query.filter_by(instructor=current_user).all()
 
     @ns.expect(course_input_model)
     @ns.marshal_with(course_model)
@@ -86,3 +98,27 @@ class StudentAPI(Resource):
         db.session.delete(student)
         db.session.commit()
         return {}, 204
+
+
+@ns.route("/register")
+class Register(Resource):
+    @ns.expect(login_model)
+    @ns.marshal_with(user_model)
+    def post(self):
+        user = User(username=ns.payload["username"], password_hash=generate_password_hash(ns.payload['password']))
+        db.session.add(user)
+        db.session.commit()
+        return user, 201
+
+
+@ns.route("/login")
+class Login(Resource):
+
+    @ns.expect(login_model)
+    def post(self):
+        user = User.query.filter_by(username=ns.payload["username"]).first()
+        if not user:
+            return {"error": "User does not exist"}, 401
+        if not check_password_hash(user.password_hash, ns.payload["password"]):
+            return {"error": "Incorrect password"}, 401
+        return {"access_token": create_access_token(user)}
